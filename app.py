@@ -2,7 +2,6 @@ from flask import Flask, request, jsonify
 from Crypto.Cipher import AES
 from Crypto.Util.Padding import pad, unpad
 import data_pb2
-import os
 
 app = Flask(__name__)
 
@@ -68,4 +67,4 @@ def decrypt():
         return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(host='0.0.0.0', port=5000)
