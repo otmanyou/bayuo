@@ -1,213 +1,71 @@
 from flask import Flask, request, jsonify
 from Crypto.Cipher import AES
 from Crypto.Util.Padding import pad, unpad
-import data_pb2  # سيتم استخدام الملف الذي لديك
+import data_pb2
 import os
 
 app = Flask(__name__)
 
-# التهيئة - مفاتيح التشفير
+# مفاتيح التشفير
 key = bytes([89, 103, 38, 116, 99, 37, 68, 69, 117, 104, 54, 37, 90, 99, 94, 56])
 iv = bytes([54, 111, 121, 90, 68, 114, 50, 50, 69, 51, 121, 99, 104, 106, 77, 37])
 
-@app.route('/')
-def home():
-    return """
-    <!DOCTYPE html>
-    <html dir="rtl">
-    <head>
-        <meta charset="UTF-8">
-        <title>نظام التشفير</title>
-        <style>
-            body {
-                font-family: 'Arial', sans-serif;
-                max-width: 800px;
-                margin: 0 auto;
-                padding: 20px;
-                background-color: #f5f5f5;
-            }
-            .container {
-                background: white;
-                padding: 30px;
-                border-radius: 10px;
-                box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            }
-            h1 {
-                color: #2c3e50;
-                text-align: center;
-            }
-            textarea {
-                width: 100%;
-                height: 120px;
-                padding: 12px;
-                border: 1px solid #ddd;
-                border-radius: 5px;
-                margin: 10px 0;
-                font-size: 16px;
-            }
-            button {
-                background-color: #3498db;
-                color: white;
-                border: none;
-                padding: 12px 20px;
-                border-radius: 5px;
-                cursor: pointer;
-                font-size: 16px;
-                transition: background 0.3s;
-            }
-            button:hover {
-                background-color: #2980b9;
-            }
-            .result {
-                margin-top: 20px;
-                padding: 15px;
-                background: #f9f9f9;
-                border-radius: 5px;
-                border: 1px solid #eee;
-                white-space: pre-wrap;
-            }
-        </style>
-    </head>
-    <body>
-        <div class="container">
-            <h1>🚀 نظام التشفير المتقدم</h1>
-            
-            <div>
-                <h2>🔒 تشفير النص</h2>
-                <textarea id="textToEncrypt" placeholder="أدخل النص المراد تشفيره هنا..."></textarea>
-                <button onclick="encryptText()">تشفير النص</button>
-                <div class="result" id="encryptionResult"></div>
-            </div>
-            
-            <div>
-                <h2>🔓 فك التشفير</h2>
-                <textarea id="textToDecrypt" placeholder="أدخل النص المشفر هنا (بتنسيق HEX)..."></textarea>
-                <button onclick="decryptText()">فك التشفير</button>
-                <div class="result" id="decryptionResult"></div>
-            </div>
-        </div>
-        
-        <script>
-            async function encryptText() {
-                const text = document.getElementById('textToEncrypt').value;
-                if (!text) {
-                    alert('الرجاء إدخال نص للتشفير');
-                    return;
-                }
-                
-                try {
-                    const response = await fetch('/api/encrypt', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ text: text })
-                    });
-                    const result = await response.json();
-                    
-                    if (result.status === 'success') {
-                        document.getElementById('encryptionResult').innerHTML = 
-                            `<strong>النص المشفر:</strong><br>${result.encrypted_data}`;
-                    } else {
-                        document.getElementById('encryptionResult').innerHTML = 
-                            `<strong>خطأ:</strong> ${result.error}`;
-                    }
-                } catch (error) {
-                    document.getElementById('encryptionResult').innerHTML = 
-                        `<strong>حدث خطأ:</strong> ${error.message}`;
-                }
-            }
-            
-            async function decryptText() {
-                const text = document.getElementById('textToDecrypt').value;
-                if (!text) {
-                    alert('الرجاء إدخال نص مشفر');
-                    return;
-                }
-                
-                try {
-                    const response = await fetch('/api/decrypt', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ text: text })
-                    });
-                    const result = await response.json();
-                    
-                    if (result.status === 'success') {
-                        document.getElementById('decryptionResult').innerHTML = 
-                            `<strong>النص الأصلي:</strong><br>${result.decrypted_data}`;
-                    } else {
-                        document.getElementById('decryptionResult').innerHTML = 
-                            `<strong>خطأ:</strong> ${result.error}`;
-                    }
-                } catch (error) {
-                    document.getElementById('decryptionResult').innerHTML = 
-                        `<strong>حدث خطأ:</strong> ${error.message}`;
-                }
-            }
-        </script>
-    </body>
-    </html>
-    """
-
 @app.route('/api/encrypt', methods=['POST'])
-def api_encrypt():
+def encrypt():
     """واجهة API للتشفير"""
     try:
         data = request.get_json()
         if not data or 'text' not in data:
-            return jsonify({'status': 'error', 'error': 'نص الإدخال مطلوب'}), 400
-        
+            return jsonify({'error': 'النص المطلوب تشفيره مطلوب'}), 400
+
         # إنشاء رسالة protobuf
         pb_data = data_pb2.Data()
         pb_data.field_2 = 17
         pb_data.field_8 = data['text']
         pb_data.field_9 = 1
-        
+
         # التشفير
         serialized = pb_data.SerializeToString()
         cipher = AES.new(key, AES.MODE_CBC, iv)
         encrypted = cipher.encrypt(pad(serialized, AES.block_size))
-        
+
         # تحويل إلى HEX
         encrypted_hex = ' '.join(f"{b:02X}" for b in encrypted)
-        
+
         return jsonify({
             'status': 'success',
             'encrypted_data': encrypted_hex
         })
+
     except Exception as e:
-        return jsonify({
-            'status': 'error',
-            'error': str(e)
-        }), 500
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/api/decrypt', methods=['POST'])
-def api_decrypt():
+def decrypt():
     """واجهة API لفك التشفير"""
     try:
         data = request.get_json()
         if not data or 'text' not in data:
-            return jsonify({'status': 'error', 'error': 'النص المشفر مطلوب'}), 400
-        
+            return jsonify({'error': 'النص المشفر مطلوب'}), 400
+
         # تحويل HEX إلى bytes
         encrypted_bytes = bytes.fromhex(data['text'].replace(' ', ''))
-        
+
         # فك التشفير
         cipher = AES.new(key, AES.MODE_CBC, iv)
         decrypted = unpad(cipher.decrypt(encrypted_bytes), AES.block_size)
-        
+
         # تحليل protobuf
         pb_data = data_pb2.Data()
         pb_data.ParseFromString(decrypted)
-        
+
         return jsonify({
             'status': 'success',
             'decrypted_data': pb_data.field_8
         })
+
     except Exception as e:
-        return jsonify({
-            'status': 'error',
-            'error': str(e)
-        }), 500
+        return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
-     app.run(debug=True , host='0.0.0.0', port=5000)
+    app.run(debug=True)
